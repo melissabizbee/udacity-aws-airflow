@@ -10,7 +10,7 @@ from airflow.contrib.hooks.aws_hook import AwsHook
 
 # Importing operators
 from airflow.operators.dummy_operator import DummyOperator
-from Archive.create_schema import CreateSchemaOperator
+from custom_operators.create_schema import CreateSchemaOperator
 from custom_operators.stage_redshift import StageToRedshiftOperator
 from custom_operators.load_fact import LoadFactOperator
 from custom_operators.load_dimension import LoadDimensionOperator
@@ -18,6 +18,7 @@ from custom_operators.data_quality import DataQualityOperator
 
 # Importing SQL queries
 from sql.final_project_sql_statements import sqlqueries
+from sql.final_project_sql_schema import sqlschema
 
 # default parameters for DAG
 default_args = {
@@ -44,6 +45,13 @@ def final_project():
     @task
     def start_execution():
         return 'start_execution'
+
+    create_schema = CreateSchemaOperator(
+        task_id="Create_schema",
+        redshift_conn_id="redshift",
+        sql=sqlschema.create,
+        skip=False
+    )
 
     stage_events_to_redshift = StageToRedshiftOperator(
         task_id='Stage_events',
@@ -121,8 +129,9 @@ def final_project():
     start_execution = start_execution()
     end_execution = end_execution()
 
-    start_execution >> stage_events_to_redshift >> load_songplays
-    start_execution >> stage_songs_to_redshift >> load_songplays
+    start_execution >> create_schema
+    create_schema >> stage_events_to_redshift >> load_songplays
+    create_schema >> stage_songs_to_redshift >> load_songplays
     load_songplays >> load_users >> run_quality_checks
     load_songplays >> load_songs >> run_quality_checks
     load_songplays >> load_artists >> run_quality_checks
